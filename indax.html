@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>饭店点单系统 (纯前端版)</title>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Element Plus -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <script src="https://unpkg.com/element-plus"></script>
+  <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background:
+        url('https://www.toptal.com/designers/subtlepatterns/uploads/moroccan-flower.png') repeat,
+        linear-gradient(135deg, #4facfe, #00f2fe);
+      background-size: cover;
+      color: #fff;
+    }
+    #app {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px 30px;
+      background-color: rgba(0, 0, 0, 0.6);
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    }
+    h1 {
+      color: #ffeb3b;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    h3 {
+      color: #ffe082;
+      margin-top: 25px;
+    }
+    .el-table {
+      background-color: rgba(255,255,255,0.9);
+      color: #333;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .el-button {
+      background-color: #ff7043 !important;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+    }
+    .el-button:hover {
+      background-color: #f4511e !important;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <el-card shadow="hover">
+    <h1>饭店点单系统</h1>
+    <el-divider></el-divider>
+
+    <!-- 菜单区 -->
+    <h3>菜单</h3>
+    <el-table :data="menuData" border style="width: 100%; margin-bottom: 20px;">
+      <el-table-column prop="id" label="编号" width="80"></el-table-column>
+      <el-table-column prop="name" label="菜名"></el-table-column>
+      <el-table-column label="单价(元)" width="120">
+        <template #default="scope">
+          {{ scope.row.price.toFixed(2) }}
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-form inline>
+      <el-form-item label="菜号">
+        <el-input v-model.number="dishId" type="number" placeholder="例如 1" style="width: 120px;"></el-input>
+      </el-form-item>
+      <el-form-item label="数量">
+        <el-input v-model.number="qty" type="number" placeholder="例如 2" style="width: 120px;"></el-input>
+      </el-form-item>
+      <el-button type="primary" @click="addOrder">点菜</el-button>
+    </el-form>
+
+    <el-divider></el-divider>
+
+    <!-- 账单区 -->
+    <h3>账单</h3>
+    <el-table v-if="orders.length > 0" :data="orders" border style="width: 100%; margin-bottom: 20px;">
+      <el-table-column prop="dishName" label="菜名"></el-table-column>
+      <el-table-column prop="quantity" label="数量" width="100"></el-table-column>
+      <el-table-column label="总价(元)" width="140">
+        <template #default="scope">
+          {{ scope.row.cost.toFixed(2) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="210">
+        <template #default="scope">
+          <el-button size="small" type="danger" @click="deleteOne(scope.$index)">删除一份</el-button>
+          <el-button size="small" @click="deleteAll(scope.$index)">删除该菜</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <p v-else>暂无订单</p>
+
+    <!-- 总价 -->
+    <el-alert v-if="orders.length > 0" type="success" :closable="false" show-icon>
+      <template #title>
+        总价：{{ totalCost.toFixed(2) }} 元
+      </template>
+    </el-alert>
+  </el-card>
+</div>
+
+<script>
+  const { createApp } = Vue
+
+  createApp({
+    data() {
+      return {
+        // ✅ 写死在前端的菜单数据（可按需修改）
+        menuData: [
+          { id: 1, name: "红烧肉",   price: 20 },
+          { id: 2, name: "宫保鸡丁", price: 18 },
+          { id: 3, name: "米饭",     price: 2  }
+        ],
+        // 订单：[{ dishId, dishName, quantity, cost }]
+        orders: [],
+        dishId: null,
+        qty: null
+      }
+    },
+    computed: {
+      totalCost() {
+        return this.orders.reduce((sum, o) => sum + o.cost, 0)
+      }
+    },
+    methods: {
+      addOrder() {
+        const id = Number(this.dishId)
+        const q  = Number(this.qty)
+
+        if (!Number.isInteger(id) || id <= 0) {
+          this.$message.warning('请输入正确的菜号（正整数）')
+          return
+        }
+        if (!Number.isInteger(q) || q <= 0) {
+          this.$message.warning('请输入正确的数量（正整数）')
+          return
+        }
+
+        const dish = this.menuData.find(d => d.id === id)
+        if (!dish) {
+          this.$message.error('未找到该菜号')
+          return
+        }
+
+        // 如果已点过相同菜，叠加数量与金额
+        const existing = this.orders.find(o => o.dishId === id)
+        if (existing) {
+          existing.quantity += q
+          existing.cost = existing.quantity * dish.price
+        } else {
+          this.orders.push({
+            dishId: id,
+            dishName: dish.name,
+            quantity: q,
+            cost: dish.price * q
+          })
+        }
+
+        this.$message.success(`已添加：${dish.name} × ${q}`)
+        this.dishId = null
+        this.qty = null
+      },
+      deleteOne(index) {
+        const row = this.orders[index]
+        if (!row) return
+        row.quantity -= 1
+        if (row.quantity <= 0) {
+          this.orders.splice(index, 1)
+        } else {
+          const price = this.menuData.find(d => d.id === row.dishId)?.price ?? 0
+          row.cost = row.quantity * price
+        }
+      },
+      deleteAll(index) {
+        this.orders.splice(index, 1)
+      }
+    }
+  })
+  .use(ElementPlus)
+  .mount('#app')
+</script>
+</body>
+</html>
