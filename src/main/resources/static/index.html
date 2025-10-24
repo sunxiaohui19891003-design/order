@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>饭店点单系统 (完整版)</title>
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Element Plus -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <script src="https://unpkg.com/element-plus"></script>
+  <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background:
+        url('https://www.toptal.com/designers/subtlepatterns/uploads/moroccan-flower.png') repeat,
+        linear-gradient(135deg, #4facfe, #00f2fe);
+      background-size: cover;
+      color: #fff;
+    }
+    #app {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px 30px;
+      background-color: rgba(0, 0, 0, 0.6);
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    }
+    h1 {
+      color: #ffeb3b;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    h3 {
+      color: #ffe082;
+      margin-top: 25px;
+    }
+    .el-table {
+      background-color: rgba(255,255,255,0.9);
+      color: #333;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .el-button {
+      background-color: #ff7043 !important;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+    }
+    .el-button:hover {
+      background-color: #f4511e !important;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <el-card shadow="hover">
+    <h1>饭店点单系统</h1>
+    <el-divider></el-divider>
+
+    <!-- 菜单区 -->
+    <h3>菜单</h3>
+    <el-table :data="menuData" border style="width: 100%; margin-bottom: 20px;">
+      <el-table-column prop="id" label="编号" width="80"></el-table-column>
+      <el-table-column prop="name" label="菜名"></el-table-column>
+      <el-table-column prop="price" label="单价(元)" width="120"></el-table-column>
+    </el-table>
+
+    <el-form inline>
+      <el-form-item label="菜号">
+        <el-input v-model="dishId" type="number" style="width: 100px;"></el-input>
+      </el-form-item>
+      <el-form-item label="数量">
+        <el-input v-model="qty" type="number" style="width: 100px;"></el-input>
+      </el-form-item>
+      <el-button type="primary" @click="addOrder">点菜</el-button>
+    </el-form>
+
+    <el-divider></el-divider>
+
+    <!-- 账单区 -->
+    <h3>账单</h3>
+    <el-table v-if="orders.length > 0" :data="orders" border style="width: 100%; margin-bottom: 20px;">
+      <el-table-column prop="dishName" label="菜名"></el-table-column>
+      <el-table-column prop="quantity" label="数量" width="100"></el-table-column>
+      <el-table-column prop="cost" label="总价(元)" width="120"></el-table-column>
+      <el-table-column label="操作" width="150">
+        <template #default="scope">
+          <el-button size="small" type="danger" @click="deleteOne(scope.$index)">删除一份</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <p v-else>暂无订单</p>
+
+    <!-- 总价 -->
+    <el-alert v-if="orders.length > 0" type="success" :closable="false" show-icon>
+      <template #title>
+        总价：{{ totalCost }} 元
+      </template>
+    </el-alert>
+  </el-card>
+</div>
+
+<script>
+  const API = '/api';
+  const { createApp } = Vue;
+
+  createApp({
+    data() {
+      return {
+        menuData: [],
+        orders: [],
+        dishId: '',
+        qty: ''
+      }
+    },
+    computed: {
+      totalCost() {
+        return this.orders.reduce((sum, o) => sum + o.cost, 0);
+      }
+    },
+    methods: {
+      loadMenu() {
+        // 获取菜单数据
+        fetch(API + '/menu')
+          .then(r => r.json())
+          .then(data => {
+            // 假设后台没有价格数据，这里临时配价格
+            const defaultPrices = [20, 18, 2]; // 根据你后端固定的价格
+            this.menuData = data.map((name, i) => ({
+              id: i + 1,
+              name,
+              price: defaultPrices[i] || 0
+            }));
+          });
+      },
+      loadOrders() {
+        fetch(API + '/orders')
+          .then(r => r.json())
+          .then(data => this.orders = data);
+      },
+      addOrder() {
+        if (!this.dishId || !this.qty) {
+          this.$message.warning('请输入菜号和数量');
+          return;
+        }
+        fetch(API + `/order?dish=${this.dishId}&qty=${this.qty}`, { method: 'POST' })
+          .then(() => {
+            this.$message.success('点菜成功');
+            this.loadOrders();
+          });
+      },
+      deleteOne(index) {
+        fetch(API + `/delete?index=${index}`, { method: 'DELETE' })
+          .then(() => {
+            this.$message.success('已删除一份');
+            this.loadOrders();
+          });
+      }
+    },
+    mounted() {
+      this.loadMenu();
+      this.loadOrders();
+    }
+  })
+  .use(ElementPlus)
+  .mount('#app');
+</script>
+</body>
+</html>
